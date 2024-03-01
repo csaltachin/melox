@@ -4,9 +4,7 @@ let read_file filename =
 
 let run source =
   print_endline "Running this source code:";
-  print_endline source;
-  Printf.printf "It has length %i.\n" (String.length source);
-  Printf.printf "It looks like this when escaped: '%s'.\n" (String.escaped source)
+  print_endline source
 
 let run_repl () =
   let rec loop () =
