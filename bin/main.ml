@@ -33,10 +33,10 @@ let run_file filename =
         exit 72
     with
     | Sys_error msg ->
-      Printf.printf "Internal error: %s" msg;
+      Printf.printf "Internal error: %s\n" msg;
       exit 70)
   else (
-    Printf.printf "Error: file %s does not exist." filename;
+    Printf.printf "Error: file %s does not exist.\n" filename;
     exit 72)
 
 let () =

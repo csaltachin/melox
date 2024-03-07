@@ -1,4 +1,4 @@
-(* Type of raw tokens. The variants for literals wrap the lexeme as a string. *)
+(** Type of raw tokens. The variants for literals wrap the lexeme as a string. *)
 type raw_t =
   (* 1-char tokens *)
   | LeftParen
@@ -45,9 +45,9 @@ type raw_t =
   (* End of file *)
   | EndOfFile
 
-(* Type of tokens produced by the scanner. Wrapps a raw token with line and offset information for nicer error reporting. *)
+(** Type of tokens produced by the scanner. Wraps a raw token with line and column information for nicer error reporting. *)
 type t =
   { raw : raw_t
   ; line : int
-  ; offset : int
+  ; col : int
   }
