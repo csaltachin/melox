@@ -7,8 +7,8 @@ type raw_t =
   | RightBrace
   | Comma
   | Dot
-  | Minus
   | Plus
+  | Minus
   | Slash
   | Star
   | Semicolon
