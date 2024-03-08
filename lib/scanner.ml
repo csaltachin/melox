@@ -19,6 +19,35 @@ type scanner_error =
   | UnterminatedBlockComment
   | UnrecognizedCharacter
 
+let match_keyword_or_identifier =
+  let open Token in
+  let find_keyword_opt =
+    [| "and", And
+     ; "class", Class
+     ; "else", Else
+     ; "false", False
+     ; "fun", Fun
+     ; "for", For
+     ; "if", If
+     ; "nil", Nil
+     ; "or", Or
+     ; "print", Print
+     ; "return", Return
+     ; "super", Super
+     ; "this", This
+     ; "true", True
+     ; "var", Var
+     ; "while", While
+    |]
+    |> Array.to_seq
+    |> Hashtbl.of_seq
+    |> Hashtbl.find_opt
+  in
+  fun lexeme ->
+    match find_keyword_opt lexeme with
+    | Some keyword_raw_token -> keyword_raw_token
+    | None -> Identifier lexeme
+
 let init source =
   let len = String.length source in
   { source; len; pos = 0; col = 0; line = 0 }
@@ -81,12 +110,16 @@ let is_alpha_or_underscore char =
 (** Consume a string literal lexeme until either a closing '"' or end of file is reached. Assumes the opening '"' has already been consumed; consumes the closing '"' if found. The returned boolean is true iff the closing '"' was reached and consumed. *)
 let consume_string_literal scanner =
   let f char = char = '"' in
-  consume_until scanner f
+  let scanner_at_quote_or_eof, lexeme = consume_until scanner f in
+  match peek scanner_at_quote_or_eof with
+  | Ok '"' -> advance_ceil scanner_at_quote_or_eof, lexeme, true
+  | _ -> scanner_at_quote_or_eof, lexeme, false
 
-(** Consume an identifier lexeme. Yields the lexeme as a string. *)
-let consume_identifier_literal scanner =
+(** Consume a lexeme that can be an identifier or a keyword. Yields the raw token directly, for convenience reasons (so that we don't need to worry about the keyword hashmap outside of this function). *)
+let consume_identifier_or_keyword scanner =
   let f char = not (is_alpha_or_underscore char || is_digit char) in
-  consume_until scanner f
+  let advanced, lexeme = consume_until scanner f in
+  advanced, match_keyword_or_identifier lexeme
 
 (** Consume a number literal lexeme. Converts the lexeme into a float value before returning. *)
 let consume_number_literal scanner =
@@ -157,5 +190,22 @@ let consume_lexeme scanner =
        in
        advanced, if comment_terminated then Ok Comment else Error UnterminatedBlockComment
      | _ -> advance_ceil scanner, Ok (RawToken Slash))
+  (* String literals *)
+  | Ok '"' ->
+    let advanced, lexeme, literal_terminated =
+      scanner |> advance_ceil |> consume_string_literal
+    in
+    ( advanced
+    , if literal_terminated
+      then Ok (RawToken (String lexeme))
+      else Error UnterminatedStringLiteral )
+  (* Number literals *)
+  | Ok char when is_digit char ->
+    let advanced, float_value = consume_number_literal scanner in
+    advanced, Ok (RawToken (Number float_value))
+  (* Identifiers and keywords *)
+  | Ok char when is_alpha_or_underscore char ->
+    let advanced, raw_token = consume_identifier_or_keyword scanner in
+    advanced, Ok (RawToken raw_token)
   (* Unrecognized characters *)
   | _ -> scanner, Error UnrecognizedCharacter
