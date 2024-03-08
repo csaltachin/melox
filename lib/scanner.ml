@@ -84,7 +84,7 @@ let consume_until scanner f =
     | Ok char when f char ->
       curr_scanner, String.sub curr_scanner.source start_pos acc_len
     | Error Eof -> curr_scanner, String.sub curr_scanner.source start_pos acc_len
-    | Ok _ -> aux start_pos (acc_len + 1) (advance_ceil scanner)
+    | Ok _ -> aux start_pos (acc_len + 1) (advance_ceil curr_scanner)
   in
   aux scanner.pos 0 scanner
 
@@ -94,7 +94,7 @@ let ignore_until scanner f =
     match peek curr_scanner with
     | Ok char when f char -> curr_scanner
     | Error Eof -> curr_scanner
-    | Ok _ -> aux (advance_ceil scanner)
+    | Ok _ -> aux (advance_ceil curr_scanner)
   in
   aux scanner
 
@@ -158,8 +158,8 @@ let consume_lexeme scanner =
   (* Unambiguous single-char tokens *)
   | Ok '(' -> advance_ceil scanner, Ok (RawToken LeftParen)
   | Ok ')' -> advance_ceil scanner, Ok (RawToken RightParen)
-  | Ok '[' -> advance_ceil scanner, Ok (RawToken LeftBrace)
-  | Ok ']' -> advance_ceil scanner, Ok (RawToken RightBrace)
+  | Ok '{' -> advance_ceil scanner, Ok (RawToken LeftBrace)
+  | Ok '}' -> advance_ceil scanner, Ok (RawToken RightBrace)
   | Ok ',' -> advance_ceil scanner, Ok (RawToken Comma)
   | Ok '.' -> advance_ceil scanner, Ok (RawToken Dot)
   | Ok ';' -> advance_ceil scanner, Ok (RawToken Semicolon)
