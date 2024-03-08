@@ -106,21 +106,21 @@ let string_of_wrapped token =
     if token.start_col + 1 = token.end_col
     then Printf.sprintf "%s; at line %i, col %i" of_raw line token.start_col
     else
-      (* TODO: EndOfFile tokens will always have start_col = end_col, so they will show as "col x - x". We could match for them and print them more nicely (maybe even add a Token.t variant for it or is that too much?). All other tokens always have nonempty lexemes, so that start_col < end_col, and so this branch is fine for them. *)
+      (* TODO: EndOfFile tokens will always have start_col = end_col, so they will show as "col x - (x-1)". We could match for them and print them more nicely (maybe even add a Token.t variant for it or is that too much?). All other tokens always have nonempty lexemes, so that start_col < end_col, and so this branch is fine for them. *)
       Printf.sprintf
         "%s; at line %i, col %i - %i"
         of_raw
         line
         token.start_col
-        token.end_col
+        (token.end_col - 1)
   | Multi (start_line, end_line) ->
     Printf.sprintf
       "%s; from (line %i, col %i) to (line %i, col %i)"
       of_raw
       start_line
-      end_line
       token.start_col
-      token.end_col
+      end_line
+      (token.end_col - 1)
 
 let wrap_token raw_token line_pair col_pair : t =
   let start_line, end_line = line_pair in
