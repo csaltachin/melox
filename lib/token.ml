@@ -48,6 +48,9 @@ type raw_t =
 (** Type of tokens produced by the scanner. Wraps a raw token with line and column information for nicer error reporting. *)
 type t =
   { raw : raw_t
-  ; line : int
-  ; col : int
+  ; start_line : int
+  ; start_col : int
   }
+
+let wrap_token raw_token start_line start_col : t =
+  { raw = raw_token; start_line; start_col }

@@ -11,13 +11,14 @@ type scanned_t =
   | RawToken of Token.raw_t
   | Whitespace
   | Comment
+  | EndOfSource
 
 type eof_error = Eof
 
 type scanner_error =
-  | UnterminatedStringLiteral
-  | UnterminatedBlockComment
-  | UnrecognizedCharacter
+  | UnterminatedStringLiteral of int * int
+  | UnterminatedBlockComment of int * int
+  | UnrecognizedCharacter of int * int * char
 
 let match_keyword_or_identifier =
   let open Token in
@@ -152,6 +153,8 @@ let consume_block_comment scanner =
 let consume_lexeme scanner =
   let open Token in
   match peek scanner with
+  (* Whitespace *)
+  | Ok ' ' | Ok '\t' | Ok '\r' | Ok '\n' -> advance_ceil scanner, Ok Whitespace
   (* Unambiguous single-char tokens *)
   | Ok '(' -> advance_ceil scanner, Ok (RawToken LeftParen)
   | Ok ')' -> advance_ceil scanner, Ok (RawToken RightParen)
@@ -185,20 +188,27 @@ let consume_lexeme scanner =
     (match peek_next scanner with
      | Ok '/' -> consume_line_comment scanner, Ok Comment
      | Ok '*' ->
+       let start_line = scanner.line in
+       let start_pos = scanner.pos in
        let advanced, comment_terminated =
          scanner |> advance_ceil |> advance_ceil |> consume_block_comment
        in
-       advanced, if comment_terminated then Ok Comment else Error UnterminatedBlockComment
+       ( advanced
+       , if comment_terminated
+         then Ok Comment
+         else Error (UnterminatedBlockComment (start_line, start_pos)) )
      | _ -> advance_ceil scanner, Ok (RawToken Slash))
   (* String literals *)
   | Ok '"' ->
+    let start_line = scanner.line in
+    let start_pos = scanner.pos in
     let advanced, lexeme, literal_terminated =
       scanner |> advance_ceil |> consume_string_literal
     in
     ( advanced
     , if literal_terminated
       then Ok (RawToken (String lexeme))
-      else Error UnterminatedStringLiteral )
+      else Error (UnterminatedStringLiteral (start_line, start_pos)) )
   (* Number literals *)
   | Ok char when is_digit char ->
     let advanced, float_value = consume_number_literal scanner in
@@ -207,5 +217,31 @@ let consume_lexeme scanner =
   | Ok char when is_alpha_or_underscore char ->
     let advanced, raw_token = consume_identifier_or_keyword scanner in
     advanced, Ok (RawToken raw_token)
+  (* End of source string *)
+  | Error Eof -> scanner, Ok EndOfSource
   (* Unrecognized characters *)
-  | _ -> scanner, Error UnrecognizedCharacter
+  | Ok char -> scanner, Error (UnrecognizedCharacter (scanner.line, scanner.pos, char))
+
+(** Main entry point for the scanner module. Given a source string, attempts to scans lexemes and returns a list of tokens of type [Token.t]. If a scanner error is encountered, returns the first such encountered error instead. *)
+let scan source =
+  (* Helper tail-recursive function; builds the token list in reverse. *)
+  let rec make_token_list acc scanner =
+    let start_line = scanner.line in
+    let start_col = scanner.col in
+    let advanced, scanned = consume_lexeme scanner in
+    match scanned with
+    | Ok (RawToken raw_token) ->
+      let wrapped_token = Token.wrap_token raw_token start_line start_col in
+      make_token_list (wrapped_token :: acc) advanced
+    | Ok Whitespace | Ok Comment -> make_token_list acc advanced
+    | Ok EndOfSource ->
+      let eof_token = Token.wrap_token Token.EndOfFile start_line start_col in
+      Ok (eof_token :: acc)
+    | Error e -> Error e
+    (* TODO: do we want to return all encountered errors instead of just the first one? *)
+  in
+  (* Now we initialize a scanner, build the list, and if successful, we reverse it before returning. *)
+  let init_scanner = init source in
+  match make_token_list [] init_scanner with
+  | Error e -> Error e
+  | Ok token_list -> Ok (List.rev token_list)
