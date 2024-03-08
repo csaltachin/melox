@@ -229,14 +229,16 @@ let scan source =
     let start_line = scanner.line in
     let start_col = scanner.col in
     let advanced, scanned = consume_lexeme scanner in
+    let line_pair = start_line, advanced.line in
+    let col_pair = start_col, advanced.col in
     match scanned with
     | Ok (RawToken raw_token) ->
-      let wrapped_token = Token.wrap_token raw_token start_line start_col in
+      let wrapped_token = Token.wrap_token raw_token line_pair col_pair in
       make_token_list (wrapped_token :: acc) advanced
-    | Ok Whitespace | Ok Comment -> make_token_list acc advanced
     | Ok EndOfSource ->
-      let eof_token = Token.wrap_token Token.EndOfFile start_line start_col in
+      let eof_token = Token.wrap_token Token.EndOfFile line_pair col_pair in
       Ok (eof_token :: acc)
+    | Ok Whitespace | Ok Comment -> make_token_list acc advanced
     | Error e -> Error e
     (* TODO: do we want to return all encountered errors instead of just the first one? *)
   in

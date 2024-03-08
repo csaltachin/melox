@@ -45,11 +45,16 @@ type raw_t =
   (* End of file *)
   | EndOfFile
 
+type line_range =
+  | Single of int
+  | Multi of int * int
+
 (** Type of tokens produced by the scanner. Wraps a raw token with line and column information for nicer error reporting. *)
 type t =
   { raw : raw_t
-  ; start_line : int
+  ; lines : line_range
   ; start_col : int
+  ; end_col : int
   }
 
 let string_of_raw raw_token =
@@ -96,7 +101,31 @@ let string_of_raw raw_token =
 
 let string_of_wrapped token =
   let of_raw = string_of_raw token.raw in
-  Printf.sprintf "%s; starts at line %i, col %i" of_raw token.start_line token.start_col
+  match token.lines with
+  | Single line ->
+    if token.start_col + 1 = token.end_col
+    then Printf.sprintf "%s; at line %i, col %i" of_raw line token.start_col
+    else
+      (* TODO: EndOfFile tokens will always have start_col = end_col, so they will show as "col x - x". We could match for them and print them more nicely (maybe even add a Token.t variant for it or is that too much?). All other tokens always have nonempty lexemes, so that start_col < end_col, and so this branch is fine for them. *)
+      Printf.sprintf
+        "%s; at line %i, col %i - %i"
+        of_raw
+        line
+        token.start_col
+        token.end_col
+  | Multi (start_line, end_line) ->
+    Printf.sprintf
+      "%s; from (line %i, col %i) to (line %i, col %i)"
+      of_raw
+      start_line
+      end_line
+      token.start_col
+      token.end_col
 
-let wrap_token raw_token start_line start_col : t =
-  { raw = raw_token; start_line; start_col }
+let wrap_token raw_token line_pair col_pair : t =
+  let start_line, end_line = line_pair in
+  let start_col, end_col = col_pair in
+  let lines =
+    if start_line = end_line then Single start_line else Multi (start_line, end_line)
+  in
+  { raw = raw_token; lines; start_col; end_col }
