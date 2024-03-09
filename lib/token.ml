@@ -78,9 +78,9 @@ let string_of_raw raw_token =
   | GreaterEqual -> "GreaterEqual"
   | Less -> "Less"
   | LessEqual -> "LessEqual"
-  | Identifier ident -> "Identifier |> " ^ ident
-  | String literal -> "StringLiteral |> \"" ^ literal ^ "\""
-  | Number number -> "NumberLiteral |> " ^ string_of_float number
+  | Identifier ident -> Printf.sprintf "Identifier[%s]" ident
+  | String literal -> Printf.sprintf "StringLiteral[\"%s\"]" (String.escaped literal)
+  | Number number -> Printf.sprintf "NumberLiteral[%g]" number
   | And -> "And"
   | Class -> "Class"
   | Else -> "Else"
