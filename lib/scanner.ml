@@ -113,7 +113,10 @@ let consume_number_literal scanner =
   let scanner_advanced, lexeme =
     match (peek scanner_after_int_part, peek_next scanner_after_int_part) with
     | Ok '.', Ok char when is_digit char ->
-        consume_until (advance_ceil scanner_after_int_part) f
+        let s, frac_part =
+          consume_until (advance_ceil scanner_after_int_part) f
+        in
+        (s, Printf.sprintf "%s.%s" int_part frac_part)
     | _ -> (scanner_after_int_part, int_part)
   in
   (scanner_advanced, float_of_string lexeme)
