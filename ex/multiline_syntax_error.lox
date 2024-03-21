@@ -1,0 +1,7 @@
+print "this source";
+print "is spread through";
+print "a few lines";
+var x = 3;
+
+print "but there's an error here";
+var y = $;

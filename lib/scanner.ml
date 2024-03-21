@@ -177,24 +177,24 @@ let consume_lexeme scanner =
       | Ok '/' -> (consume_line_comment scanner, Ok Comment)
       | Ok '*' ->
           let start_line = scanner.line in
-          let start_pos = scanner.pos in
+          let start_col = scanner.col in
           let advanced, comment_terminated =
             scanner |> advance_ceil |> advance_ceil |> consume_block_comment
           in
           ( advanced,
             if comment_terminated then Ok Comment
-            else Error (UnterminatedBlockComment (start_line, start_pos)) )
+            else Error (UnterminatedBlockComment (start_line, start_col)) )
       | _ -> (advance_ceil scanner, Ok (RawToken Slash)))
   (* String literals *)
   | Ok '"' ->
       let start_line = scanner.line in
-      let start_pos = scanner.pos in
+      let start_col = scanner.col in
       let advanced, lexeme, literal_terminated =
         scanner |> advance_ceil |> consume_string_literal
       in
       ( advanced,
         if literal_terminated then Ok (RawToken (String lexeme))
-        else Error (UnterminatedStringLiteral (start_line, start_pos)) )
+        else Error (UnterminatedStringLiteral (start_line, start_col)) )
   (* Number literals *)
   | Ok char when is_digit char ->
       let advanced, float_value = consume_number_literal scanner in
@@ -207,7 +207,7 @@ let consume_lexeme scanner =
   | Error Eof -> (scanner, Ok EndOfSource)
   (* Unrecognized characters *)
   | Ok char ->
-      (scanner, Error (UnrecognizedCharacter (scanner.line, scanner.pos, char)))
+      (scanner, Error (UnrecognizedCharacter (scanner.line, scanner.col, char)))
 
 (** Main entry point for the scanner module. Given a source string, attempts to scans lexemes and returns a list of tokens of type [Token.t]. If a scanner error is encountered, returns the first such encountered error instead. *)
 let scan source =
@@ -237,17 +237,17 @@ let scan source =
 
 let scanner_error_message error =
   match error with
-  | UnterminatedStringLiteral (line, pos) ->
+  | UnterminatedStringLiteral (line, col) ->
       Printf.sprintf
         "Error [scanner]: Unterminated string literal starting at line %i, \
-         position %i"
-        line pos
-  | UnterminatedBlockComment (line, pos) ->
+         column %i"
+        line col
+  | UnterminatedBlockComment (line, col) ->
       Printf.sprintf
         "Error [scanner]: Unterminated block comment starting at line %i, \
-         position %i"
-        line pos
-  | UnrecognizedCharacter (line, pos, char) ->
+         column %i"
+        line col
+  | UnrecognizedCharacter (line, col, char) ->
       Printf.sprintf
-        "Error [scanner]: Unrecognized character %C at line %i, position %i"
-        char line pos
+        "Error [scanner]: Unrecognized character %C at line %i, column %i" char
+        line col

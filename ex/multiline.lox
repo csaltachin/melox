@@ -1,0 +1,4 @@
+print "this source";
+print "is spread through";
+print "a few lines";
+var x = 3;
