@@ -117,6 +117,8 @@ let wrap_token raw_token line_pair col_pair : t =
   in
   { raw = raw_token; lines; start_col; end_col }
 
+let is_eof_token token = token.raw = EndOfFile
+
 let recover_lexeme token =
   match token.raw with
   | LeftParen -> "("

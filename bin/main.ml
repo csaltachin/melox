@@ -9,6 +9,7 @@ let run source =
       let _ = print_endline "Scanned the following tokens:" in
       let _ =
         tokens
+        |> List.filter (fun token -> token |> Melox.Token.is_eof_token |> not)
         |> List.map (fun token ->
                Melox.Token.string_of_wrapped token |> print_endline)
       in
