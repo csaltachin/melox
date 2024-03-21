@@ -43,16 +43,19 @@ let init source =
 
 let is_at_end scanner = scanner.pos = scanner.len
 
-(** Peek the character at the current position. Return Error Eof if the scanner was already at the end of file. *)
+(** Peek the character at the current position. Return Error Eof if the scanner
+    was already at the end of file. *)
 let peek scanner =
   if is_at_end scanner then Error Eof else Ok scanner.source.[scanner.pos]
 
-(** Peek the character at the position right after the current one. Return Error Eof if said position is past the end of file. *)
+(** Peek the character at the position right after the current one. Return Error
+    Eof if said position is past the end of file. *)
 let peek_next scanner =
   let can_peek = scanner.pos < scanner.len - 1 in
   if can_peek then Ok scanner.source.[scanner.pos + 1] else Error Eof
 
-(** Advance the scanner by 1 character, updating line and column numbers. Returns Error Eof if the scanner was already at the end of file. *)
+(** Advance the scanner by 1 character, updating line and column numbers.
+    Returns Error Eof if the scanner was already at the end of file. *)
 let advance scanner =
   match peek scanner with
   | Ok '\n' ->
@@ -61,11 +64,14 @@ let advance scanner =
   | Ok _ -> Ok { scanner with pos = scanner.pos + 1; col = scanner.col + 1 }
   | Error Eof -> Error Eof
 
-(** Advance the scanner by 1 character and return it directly. If the scanner was already at the end of file, simply returns the original scanner. *)
+(** Advance the scanner by 1 character and return it directly. If the scanner
+    was already at the end of file, simply returns the original scanner. *)
 let advance_ceil scanner =
   match advance scanner with Ok advanced -> advanced | Error Eof -> scanner
 
-(** Advance the scanner until we either peek a char c such that (f c) evaluates to true, or we reach the end of file. Return the advanced scanner and the consumed substring. *)
+(** Advance the scanner until we either peek a char c such that (f c) evaluates
+    to true, or we reach the end of file. Return the advanced scanner and the
+    consumed substring. *)
 let consume_until scanner f =
   let rec aux start_pos acc_len curr_scanner =
     match peek curr_scanner with
@@ -77,7 +83,8 @@ let consume_until scanner f =
   in
   aux scanner.pos 0 scanner
 
-(** Same as consume_until, but does not return the consumed substring; just the advanced scanner. *)
+(** Same as consume_until, but does not return the consumed substring; just the
+    advanced scanner. *)
 let ignore_until scanner f =
   let rec aux curr_scanner =
     match peek curr_scanner with
@@ -92,7 +99,10 @@ let is_digit char = match char with '0' .. '9' -> true | _ -> false
 let is_alpha_or_underscore char =
   match char with 'a' .. 'z' | 'A' .. 'Z' | '_' -> true | _ -> false
 
-(** Consume a string literal lexeme until either a closing '"' or end of file is reached. Assumes the opening '"' has already been consumed; consumes the closing '"' if found. The returned boolean is true iff the closing '"' was reached and consumed. *)
+(** Consume a string literal lexeme until either a closing '"' or end of file is
+    reached. Assumes the opening '"' has already been consumed; consumes the
+    closing '"' if found. The returned boolean is true iff the closing '"' was
+    reached and consumed. *)
 let consume_string_literal scanner =
   let f char = char = '"' in
   let scanner_at_quote_or_eof, lexeme = consume_until scanner f in
@@ -100,13 +110,16 @@ let consume_string_literal scanner =
   | Ok '"' -> (advance_ceil scanner_at_quote_or_eof, lexeme, true)
   | _ -> (scanner_at_quote_or_eof, lexeme, false)
 
-(** Consume a lexeme that can be an identifier or a keyword. Yields the raw token directly, for convenience reasons (so that we don't need to worry about the keyword hashmap outside of this function). *)
+(** Consume a lexeme that can be an identifier or a keyword. Yields the raw
+    token directly, for convenience reasons (so that we don't need to worry
+    about the keyword hashmap outside of this function). *)
 let consume_identifier_or_keyword scanner =
   let f char = not (is_alpha_or_underscore char || is_digit char) in
   let advanced, lexeme = consume_until scanner f in
   (advanced, match_keyword_or_identifier lexeme)
 
-(** Consume a number literal lexeme. Converts the lexeme into a float value before returning. *)
+(** Consume a number literal lexeme. Converts the lexeme into a float value
+    before returning. *)
 let consume_number_literal scanner =
   let f char = not (is_digit char) in
   let scanner_after_int_part, int_part = consume_until scanner f in
@@ -121,13 +134,17 @@ let consume_number_literal scanner =
   in
   (scanner_advanced, float_of_string lexeme)
 
-(** Advances the scanner until either a newline or end of file is reached, ignoring characters in the way. Consumes the newline if found. *)
+(** Advances the scanner until either a newline or end of file is reached,
+    ignoring characters in the way. Consumes the newline if found. *)
 let consume_line_comment scanner =
   let f char = char = '\n' in
   let scanner_at_newline_or_eof = ignore_until scanner f in
   advance_ceil scanner_at_newline_or_eof
 
-(** Advances the scanner until either "*/" or end of file is reached, ignoring other characters in the way. Assumes the opening "/*" has already been consumed; consumes the final "*/" if found. The returned boolean is true iff the closing "*/" was reached and consumed. *)
+(** Advances the scanner until either "*/" or end of file is reached, ignoring
+    other characters in the way. Assumes the opening "/*" has already been
+    consumed; consumes the final "*/" if found. The returned boolean is true iff
+    the closing "*/" was reached and consumed. *)
 let consume_block_comment scanner =
   let rec aux curr_scanner =
     match (peek curr_scanner, peek_next curr_scanner) with
@@ -212,7 +229,9 @@ let consume_lexeme scanner =
   | Ok char ->
       (scanner, Error (UnrecognizedCharacter (scanner.line, scanner.col, char)))
 
-(** Main entry point for the scanner module. Given a source string, attempts to scans lexemes and returns a list of tokens of type [Token.t]. If a scanner error is encountered, returns the first such encountered error instead. *)
+(** Main entry point for the scanner module. Given a source string, attempts to
+    scans lexemes and returns a list of tokens of type [Token.t]. If a scanner
+    error is encountered, returns the first such encountered error instead. *)
 let scan source =
   (* Helper tail-recursive function; builds the token list in reverse. *)
   let rec make_token_list acc scanner =
@@ -230,9 +249,11 @@ let scan source =
         Ok (eof_token :: acc)
     | Ok Whitespace | Ok Comment -> make_token_list acc advanced
     | Error e -> Error e
-    (* TODO: do we want to return all encountered errors instead of just the first one? *)
+    (* TODO: do we want to return all encountered errors instead of just the
+       first one? *)
   in
-  (* Now we initialize a scanner, build the list, and if successful, we reverse it before returning. *)
+  (* Now we initialize a scanner, build the list, and if successful, we reverse
+     it before returning. *)
   let init_scanner = init source in
   match make_token_list [] init_scanner with
   | Error e -> Error e
