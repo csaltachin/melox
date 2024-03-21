@@ -74,6 +74,7 @@ let string_of_raw raw_token =
   | Identifier ident -> Printf.sprintf "Identifier[%s]" ident
   | String literal ->
       Printf.sprintf "StringLiteral[\"%s\"]" (String.escaped literal)
+  (* TODO: do we want to print numbers with %f instead of %g here? *)
   | Number number -> Printf.sprintf "NumberLiteral[%g]" number
   | And -> "And"
   | Class -> "Class"
@@ -118,7 +119,6 @@ let wrap_token raw_token line_pair col_pair : t =
 
 let recover_lexeme token =
   match token.raw with
-  (* 1-char tokens *)
   | LeftParen -> "("
   | RightParen -> ")"
   | LeftBrace -> "["
@@ -130,7 +130,6 @@ let recover_lexeme token =
   | Slash -> "/"
   | Star -> "*"
   | Semicolon -> ";"
-  (* 1-char and 2-char tokens *)
   | Bang -> "!"
   | BangEqual -> "!="
   | Equal -> "="
@@ -139,11 +138,9 @@ let recover_lexeme token =
   | GreaterEqual -> ">="
   | Less -> "<"
   | LessEqual -> "<="
-  (* Literals *)
   | Identifier ident -> ident
   | String literal -> Printf.sprintf "\"%s\"" literal
-  | Number number -> string_of_float number
-  (* Reserved keywords *)
+  | Number number -> Printf.sprintf "%g" number
   | And -> "and"
   | Class -> "class"
   | Else -> "else"
@@ -160,5 +157,4 @@ let recover_lexeme token =
   | True -> "true"
   | Var -> "var"
   | While -> "while"
-  (* End of file *)
   | EndOfFile -> "\000"
