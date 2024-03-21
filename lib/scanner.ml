@@ -234,3 +234,20 @@ let scan source =
   match make_token_list [] init_scanner with
   | Error e -> Error e
   | Ok token_list -> Ok (List.rev token_list)
+
+let scanner_error_message error =
+  match error with
+  | UnterminatedStringLiteral (line, pos) ->
+      Printf.sprintf
+        "Error [scanner]: Unterminated string literal starting at line %i, \
+         position %i"
+        line pos
+  | UnterminatedBlockComment (line, pos) ->
+      Printf.sprintf
+        "Error [scanner]: Unterminated block comment starting at line %i, \
+         position %i"
+        line pos
+  | UnrecognizedCharacter (line, pos, char) ->
+      Printf.sprintf
+        "Error [scanner]: Unrecognized character %C at line %i, position %i"
+        char line pos
