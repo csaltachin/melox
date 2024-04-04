@@ -231,8 +231,11 @@ let consume_lexeme scanner =
 
 (** Main entry point for the scanner module. Given a source string, attempts to
     scans lexemes and returns a list of tokens of type [Token.t]. If a scanner
-    error is encountered, returns the first such encountered error instead. *)
-let scan source =
+    error is encountered, returns the first such encountered error instead.
+
+    The [drop_eof] parameter indicates whether to drop the trailing EOF token;
+    it is set to [true] by default. *)
+let scan ?(drop_eof = true) source =
   (* Helper tail-recursive function; builds the token list in reverse. *)
   let rec make_token_list acc scanner =
     let start_line = scanner.line in
@@ -245,8 +248,15 @@ let scan source =
         let wrapped_token = Token.wrap_token raw_token line_pair col_pair in
         make_token_list (wrapped_token :: acc) advanced
     | Ok EndOfSource ->
-        let eof_token = Token.wrap_token Token.EndOfFile line_pair col_pair in
-        Ok (eof_token :: acc)
+        let tokens =
+          if drop_eof then acc
+          else
+            let eof_token =
+              Token.wrap_token Token.EndOfFile line_pair col_pair
+            in
+            eof_token :: acc
+        in
+        Ok tokens
     | Ok Whitespace | Ok Comment -> make_token_list acc advanced
     | Error e -> Error e
     (* TODO: do we want to return all encountered errors instead of just the

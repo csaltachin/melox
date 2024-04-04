@@ -4,12 +4,11 @@ let read_file filename =
 
 let run source =
   let open Melox.Scanner in
-  match scan source with
+  match scan ~drop_eof:true source with
   | Ok tokens ->
       let _ = print_endline "Scanned the following tokens:" in
       let _ =
         tokens
-        |> List.filter (fun token -> token |> Melox.Token.is_eof_token |> not)
         |> List.map (fun token ->
                Melox.Token.string_of_wrapped token |> print_endline)
       in
