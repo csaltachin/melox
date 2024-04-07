@@ -55,16 +55,10 @@ let advance_ceil parser = Result.value (advance parser) ~default:parser
 
 (** Peek the current token. If the peek succeeds as [Ok token] and
     [matches token.raw] is true, then consume the token, and return the advanced
-    parser and [Some token]. Otherwise, return back the same parser state and
-    [None]. *)
+    parser and [Some token] wrapped in [Ok]. If [matches token.raw] is false,
+    then return the original parser and [None] wrapped in [Ok]. If the peek
+    fails, return [Error Eof]. *)
 let advance_if_match (matches : Token.raw_t -> bool) parser =
-  match peek parser with
-  | Ok token when matches token.raw -> (advance_ceil parser, Some token)
-  | _ -> (parser, None)
-
-(** Same as [advance_if_match], but wraps the returned pair in [Ok], and returns
-    [Error Eof] if peeking fails. *)
-let advance_if_match_result (matches : Token.raw_t -> bool) parser =
   match peek parser with
   | Ok token when matches token.raw -> Ok (advance_ceil parser, Some token)
   | Ok _ -> Ok (parser, None)
@@ -101,7 +95,7 @@ let consume_binary_left_assoc (consumer : parse_consumer)
     (matches : Token.raw_t -> bool) : parse_consumer =
   let ( let* ) = Result.bind in
   let rec make_aux_list acc parser =
-    match advance_if_match_result matches parser with
+    match advance_if_match matches parser with
     | Error Eof -> Error UnexpectedEof
     | Ok (parser, None) -> Ok (parser, List.rev acc)
     | Ok (after_match, Some op_token) ->
