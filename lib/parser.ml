@@ -117,3 +117,86 @@ let consume_binary_left_assoc (consumer : parse_consumer)
     let* after_first, first_node = consumer parser in
     let* after_last, aux_list = make_aux_list [] after_first in
     Ok (after_last, tree_of_aux_list first_node aux_list)
+
+(* The following are parse-consumers for the Lox grammar rules, following the
+   book. *)
+
+let rec consume_expression : parse_consumer =
+ fun parser -> consume_equality parser
+
+and consume_equality : parse_consumer =
+  let open Token in
+  let matches raw_token =
+    match raw_token with EqualEqual | BangEqual -> true | _ -> false
+  in
+  fun parser -> consume_binary_left_assoc consume_comparison matches parser
+
+and consume_comparison : parse_consumer =
+  let open Token in
+  let matches raw_token =
+    match raw_token with
+    | Greater | GreaterEqual | Less | LessEqual -> true
+    | _ -> false
+  in
+  fun parser -> consume_binary_left_assoc consume_term matches parser
+
+and consume_term : parse_consumer =
+  let open Token in
+  let matches raw_token =
+    match raw_token with Plus | Minus -> true | _ -> false
+  in
+  fun parser -> consume_binary_left_assoc consume_factor matches parser
+
+and consume_factor : parse_consumer =
+  let open Token in
+  let matches raw_token =
+    match raw_token with Star | Slash -> true | _ -> false
+  in
+  fun parser -> consume_binary_left_assoc consume_unary matches parser
+
+and consume_unary : parse_consumer =
+  let open Token in
+  let ( let* ) = Result.bind in
+  let is_unary_op raw_token =
+    match raw_token with Bang | Minus -> true | _ -> false
+  in
+  fun parser ->
+    match peek parser with
+    | Error Eof -> Error UnexpectedEof
+    | Ok op when is_unary_op op.raw ->
+        let* after_node, right = consume_unary parser in
+        let node = Ast.Unary { op; right } in
+        Ok (after_node, node)
+    | _ -> consume_primary parser
+
+and consume_primary : parse_consumer =
+  let open Token in
+  let ( let* ) = Result.bind in
+  fun parser ->
+    let* peeked = peek parser |> Result.map_error (fun Eof -> UnexpectedEof) in
+    match peeked.raw with
+    | True ->
+        let literal = Ast.Literal (Object.LoxBoolean true) in
+        Ok (advance_ceil parser, literal)
+    | False ->
+        let literal = Ast.Literal (Object.LoxBoolean false) in
+        Ok (advance_ceil parser, literal)
+    | Nil ->
+        let literal = Ast.Literal Object.LoxNil in
+        Ok (advance_ceil parser, literal)
+    | Number x ->
+        let literal = Ast.Literal (Object.LoxNumber x) in
+        Ok (advance_ceil parser, literal)
+    | String s ->
+        let literal = Ast.Literal (Object.LoxString s) in
+        Ok (advance_ceil parser, literal)
+    | LeftParen ->
+        let after_left_paren = advance_ceil parser in
+        let* after_inner, inner = consume_expression after_left_paren in
+        let* peeked_right =
+          peek parser |> Result.map_error (fun Eof -> UnexpectedEof)
+        in
+        if peeked_right.raw = RightParen then
+          Ok (advance_ceil after_inner, Ast.Grouping inner)
+        else Error UnexpectedToken
+    | _ -> Error UnexpectedToken
