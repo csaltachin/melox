@@ -107,8 +107,7 @@ let consume_binary_left_assoc (consumer : parse_consumer)
   let ( let* ) = Result.bind in
   let rec make_aux_list acc parser =
     match consume_token_if_match raw_list parser with
-    | Error Eof -> Error UnexpectedEof
-    | Ok (parser, None) -> Ok (parser, List.rev acc)
+    | Error Eof | Ok (_, None) -> Ok (parser, List.rev acc)
     | Ok (after_match, Some op_token) ->
         let* after_node, right_node = consumer after_match in
         let acc' = (op_token, right_node) :: acc in
@@ -169,7 +168,7 @@ and consume_unary : parse_consumer =
     match peek parser with
     | Error Eof -> Error UnexpectedEof
     | Ok op when is_unary_op op.raw ->
-        let* after_node, right = consume_unary parser in
+        let* after_node, right = consume_unary (advance_ceil parser) in
         let node = Ast.Unary { op; right } in
         Ok (after_node, node)
     | _ -> consume_primary parser
@@ -205,3 +204,13 @@ and consume_primary : parse_consumer =
           Ok (advance_ceil after_inner, Ast.Grouping inner)
         else Error UnexpectedToken
     | _ -> Error UnexpectedToken
+
+(** Main entry point for the parser. Given a list of tokens, attempts to parse
+    and produce an AST. The list is assumed to not contain a final EOF token.
+    Currently, we only attempt to parse a single expression. *)
+let parse tokens =
+  let parser = init tokens in
+  (* TODO: update this when we implement statement parsing *)
+  match consume_expression parser with
+  | Ok (_, root_ast) -> Ok root_ast
+  | Error e -> Error e

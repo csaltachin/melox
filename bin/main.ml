@@ -4,15 +4,15 @@ let read_file filename =
 
 let run source =
   let open Melox.Scanner in
+  let open Melox.Parser in
   match scan ~drop_eof:true source with
-  | Ok tokens ->
-      let _ = print_endline "Scanned the following tokens:" in
-      let _ =
-        tokens
-        |> List.map (fun token ->
-               Melox.Token.string_of_wrapped token |> print_endline)
-      in
-      ()
+  | Ok tokens -> (
+      match parse tokens with
+      | Ok ast_node -> Melox.Ast.pp ast_node |> print_endline
+      | Error UnexpectedToken ->
+          print_endline "Error [parser]: Unexpected token."
+      | Error UnexpectedEof ->
+          print_endline "Error [parser]: Unexpected end of file.")
   | Error e -> scanner_error_message e |> print_endline
 
 let run_repl () =
