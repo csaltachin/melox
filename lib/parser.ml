@@ -60,7 +60,15 @@ let advance_ceil parser = Result.value (advance parser) ~default:parser
 let advance_if_match (matches : Token.raw_t -> bool) parser =
   match peek parser with
   | Ok token when matches token.raw -> (advance_ceil parser, Some token)
-  | _ -> (advance_ceil parser, None)
+  | _ -> (parser, None)
+
+(** Same as [advance_if_match], but wraps the returned pair in [Ok], and returns
+    [Error Eof] if peeking fails. *)
+let advance_if_match_result (matches : Token.raw_t -> bool) parser =
+  match peek parser with
+  | Ok token when matches token.raw -> Ok (advance_ceil parser, Some token)
+  | Ok _ -> Ok (parser, None)
+  | Error Eof -> Error Eof
 
 (** Given a parse-consumer [consumer] and a [matches] function, returns a new
     parse-consumer that (greedily) produces a left-associative, binary AST node,
@@ -93,9 +101,10 @@ let consume_binary_left_assoc (consumer : parse_consumer)
     (matches : Token.raw_t -> bool) : parse_consumer =
   let ( let* ) = Result.bind in
   let rec make_aux_list acc parser =
-    match advance_if_match matches parser with
-    | parser, None -> Ok (parser, List.rev acc)
-    | after_match, Some op_token ->
+    match advance_if_match_result matches parser with
+    | Error Eof -> Error UnexpectedEof
+    | Ok (parser, None) -> Ok (parser, List.rev acc)
+    | Ok (after_match, Some op_token) ->
         let* after_node, right_node = consumer after_match in
         let acc' = (op_token, right_node) :: acc in
         make_aux_list acc' after_node
