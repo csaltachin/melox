@@ -63,27 +63,28 @@ let consume_token parser =
       Ok (advanced, curr)
   | _ -> Error Eof
 
-(** Peek the current token. If the peek succeeds as [Ok token] and
-    [matches token.raw] is true, then consume the token, and return the advanced
-    parser and [Some token] wrapped in [Ok]. If [matches token.raw] is false,
-    then return the original parser and [None] wrapped in [Ok]. If the peek
-    fails, return [Error Eof]. *)
-let consume_token_if_match (matches : Token.raw_t -> bool) parser =
+(** Peek the current token. If the peek succeeds as [Ok token] and [token.raw]
+    is in [raw_list], then consume the token, and return the advanced parser and
+    [Some token] wrapped in [Ok]. If [token.raw] is not in the list, then return
+    the original parser and [None] wrapped in [Ok]. If the peek fails, return
+    [Error Eof]. *)
+let consume_token_if_match (raw_list : Token.raw_t list) parser =
+  let matches (token : Token.t) = List.mem token.raw raw_list in
   match peek parser with
-  | Ok token when matches token.raw -> Ok (advance_ceil parser, Some token)
+  | Ok token when matches token -> Ok (advance_ceil parser, Some token)
   | Ok _ -> Ok (parser, None)
   | Error Eof -> Error Eof
 
-(** Given a parse-consumer [consumer] and a [matches] function, returns a new
-    parse-consumer that (greedily) produces a left-associative, binary AST node,
-    whose "leaves" are nodes produced by applications of [consumer]. A token
-    [token] is considered an operator iff [matches (token.raw)] evaluates to
-    true, and all such tokens are considered with equal precedence.
+(** Given a parse-consumer [consumer] and a list of raw token kinds [raw_list],
+    returns a new parse-consumer that (greedily) produces a left-associative,
+    binary AST node, whose "leaves" are nodes produced by applications of
+    [consumer]. The operator tokens are those with raw kinds from [raw_list],
+    and they are considered with equal precedence.
 
-    In other words, let [pi] be a precedence level, and suppose [token] is an
-    operator with precedence [pi] iff [matches (token.raw)] is true. Then
-    [consume_binary_left_assoc consumer matches] is a parse-consumer that, given
-    a parser state [parser], performs the following:
+    In other words, let [pi] be an operator precedence level, and suppose
+    [raw_list] is the list of (raw) operator tokens of precedence [pi]. Then
+    [consume_binary_left_assoc consumer raw_list] is a parse-consumer that,
+    given a parser state [parser], performs the following:
 
     (i) Attempt to apply [consumer] on [parser] to produce a new AST node [acc]
     and a parser state [parser'].
@@ -102,10 +103,10 @@ let consume_token_if_match (matches : Token.raw_t -> bool) parser =
     In particular, if [consumer] is tail-recursive, then this parse-consumer
     will also be tail-recursive. *)
 let consume_binary_left_assoc (consumer : parse_consumer)
-    (matches : Token.raw_t -> bool) : parse_consumer =
+    (raw_list : Token.raw_t list) : parse_consumer =
   let ( let* ) = Result.bind in
   let rec make_aux_list acc parser =
-    match consume_token_if_match matches parser with
+    match consume_token_if_match raw_list parser with
     | Error Eof -> Error UnexpectedEof
     | Ok (parser, None) -> Ok (parser, List.rev acc)
     | Ok (after_match, Some op_token) ->
@@ -139,33 +140,24 @@ let rec consume_expression : parse_consumer =
 
 and consume_equality : parse_consumer =
   let open Token in
-  let matches raw_token =
-    match raw_token with EqualEqual | BangEqual -> true | _ -> false
-  in
-  fun parser -> consume_binary_left_assoc consume_comparison matches parser
+  fun parser ->
+    consume_binary_left_assoc consume_comparison [ EqualEqual; BangEqual ]
+      parser
 
 and consume_comparison : parse_consumer =
   let open Token in
-  let matches raw_token =
-    match raw_token with
-    | Greater | GreaterEqual | Less | LessEqual -> true
-    | _ -> false
-  in
-  fun parser -> consume_binary_left_assoc consume_term matches parser
+  fun parser ->
+    consume_binary_left_assoc consume_term
+      [ Greater; GreaterEqual; Less; LessEqual ]
+      parser
 
 and consume_term : parse_consumer =
   let open Token in
-  let matches raw_token =
-    match raw_token with Plus | Minus -> true | _ -> false
-  in
-  fun parser -> consume_binary_left_assoc consume_factor matches parser
+  fun parser -> consume_binary_left_assoc consume_factor [ Plus; Minus ] parser
 
 and consume_factor : parse_consumer =
   let open Token in
-  let matches raw_token =
-    match raw_token with Star | Slash -> true | _ -> false
-  in
-  fun parser -> consume_binary_left_assoc consume_unary matches parser
+  fun parser -> consume_binary_left_assoc consume_unary [ Star; Slash ] parser
 
 and consume_unary : parse_consumer =
   let open Token in
