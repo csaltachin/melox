@@ -198,7 +198,7 @@ and consume_primary : parse_consumer =
         let after_left_paren = advance_ceil parser in
         let* after_inner, inner = consume_expression after_left_paren in
         let* peeked_right =
-          peek parser |> Result.map_error (fun Eof -> UnexpectedEof)
+          peek after_inner |> Result.map_error (fun Eof -> UnexpectedEof)
         in
         if peeked_right.raw = RightParen then
           Ok (advance_ceil after_inner, Ast.Grouping inner)
