@@ -4,11 +4,22 @@ let read_file filename =
 
 let run source =
   let open Melox.Scanner in
-  let open Melox.Parser in
+  (* TODO: rewrite this with let* (Result.bind) *)
   match scan ~drop_eof:true source with
   | Ok tokens -> (
+      let open Melox.Parser in
       match parse tokens with
-      | Ok ast_node -> Melox.Ast.pp ast_node |> print_endline
+      | Ok ast_node -> (
+          let open Melox.Interpreter in
+          match interpret ast_node with
+          | Ok value -> Melox.Object.pp_obj value |> print_endline
+          | Error DivisionByZero ->
+              "Error [runtime]: Division by zero." |> print_endline
+          | Error (TypeError { expected; actual }) ->
+              Printf.sprintf
+                "Error [runtime]: Type error. Expected %s, found %s." expected
+                actual
+              |> print_endline)
       | Error UnexpectedToken ->
           print_endline "Error [parser]: Unexpected token."
       | Error UnexpectedEof ->

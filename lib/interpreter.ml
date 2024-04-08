@@ -159,3 +159,7 @@ and evaluate_binary (op : Token.t) (left : Ast.expression)
           string_of_actual_raw
       in
       failwith msg
+
+(** Main entry point for the interpreter module. Given an AST, attempts to
+    evaluate it to a runtime value. Currently, we only interpret expressions. *)
+let interpret (ast : Ast.expression) = evaluate_expression ast
