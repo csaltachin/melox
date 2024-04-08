@@ -1,7 +1,11 @@
+(** Try to read file [filename], and wrap the file contents (or any internal
+    exception) in a result. It is assumed that [filename] is a valid file, i.e.
+    that [Sys.file_exists filename] is true. *)
 let read_file filename =
   try Ok (In_channel.with_open_text filename In_channel.input_all)
   with Sys_error msg -> Error msg
 
+(** Type of exit status for the main melox executable. *)
 type exit_status =
   | ExitReplOk
   | RunOk
@@ -13,6 +17,8 @@ type exit_status =
   | BadUsage
   | InternalException
 
+(** Given an exit status, return the exit code that the executable should exit
+    on. *)
 let code_of_status status =
   match status with
   | ExitReplOk -> 0
@@ -25,6 +31,9 @@ let code_of_status status =
   | BadUsage -> 64
   | InternalException -> 70
 
+(** Run the source code [source]. Return an exit status, depending on whether
+    execution was successful, a syntax error was encountered, or a runtime error
+    was raised during execution. *)
 let run source : exit_status =
   let open Melox.Scanner in
   (* TODO: rewrite this with let* (Result.bind) *)
@@ -59,7 +68,9 @@ let run source : exit_status =
       let _ = scanner_error_message e |> print_endline in
       ScanError
 
-let run_repl () =
+(** Run the REPL shell, reading lines and executing them until EOF is read, and
+    returning [ExitReplOk]. *)
+let run_repl () : exit_status =
   let rec loop () =
     print_string "> ";
     try
@@ -71,7 +82,10 @@ let run_repl () =
   in
   loop ()
 
-let run_file filename =
+(** Try to read file [filename] as Lox source code and execute it. Returns an
+    exit status depending on whether the file read was successful and/or the
+    resulting status of the code execution. *)
+let run_file filename : exit_status =
   if Sys.file_exists filename then (
     try
       match read_file filename with
@@ -89,8 +103,9 @@ let run_file filename =
     Printf.printf "Error: file %s does not exist.\n" filename;
     FileNotFound)
 
+(* Main command-line entry point for the melox executable. *)
 let () =
-  let exit_status =
+  let status =
     match Sys.argv with
     | [| _ |] -> run_repl ()
     | [| _; filename |] -> run_file filename
@@ -98,4 +113,4 @@ let () =
         print_endline "Usage: melox [script]";
         BadUsage
   in
-  exit_status |> code_of_status |> exit
+  status |> code_of_status |> exit
