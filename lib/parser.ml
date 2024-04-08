@@ -68,12 +68,29 @@ let consume_token parser =
     [Some token] wrapped in [Ok]. If [token.raw] is not in the list, then return
     the original parser and [None] wrapped in [Ok]. If the peek fails, return
     [Error Eof]. *)
-let consume_token_if_match (raw_list : Token.raw_t list) parser =
+let consume_token_if_match (raw_list : Token.raw_t list) =
   let matches (token : Token.t) = List.mem token.raw raw_list in
-  match peek parser with
-  | Ok token when matches token -> Ok (advance_ceil parser, Some token)
-  | Ok _ -> Ok (parser, None)
-  | Error Eof -> Error Eof
+  fun parser ->
+    match peek parser with
+    | Ok token when matches token -> Ok (advance_ceil parser, Some token)
+    | Ok _ -> Ok (parser, None)
+    | Error Eof -> Error Eof
+
+let expect_consume_token_if_match (raw_list : Token.raw_t list) parser =
+  match consume_token_if_match raw_list parser with
+  | Ok (_, None) -> Error UnexpectedToken
+  | Ok (parser', Some token) -> Ok (parser', token)
+  | Error Eof -> Error UnexpectedEof
+
+let expect_consume_ident =
+  let is_ident (token : Token.t) =
+    match token.raw with Token.Identifier _ -> true | _ -> false
+  in
+  fun parser ->
+    match peek parser with
+    | Ok token when is_ident token -> Ok (advance_ceil parser, token)
+    | Ok _ -> Error UnexpectedToken
+    | Error Eof -> Error UnexpectedEof
 
 (** Given a parse-consumer [consumer] and a list of raw token kinds [raw_list],
     returns a new parse-consumer that (greedily) produces a left-associative,
@@ -131,8 +148,7 @@ let consume_binary_left_assoc (consumer : parse_consumer)
     let* after_last, aux_list = make_aux_list [] after_first in
     Ok (after_last, tree_of_aux_list first_node aux_list)
 
-(* The following are parse-consumers for the Lox grammar rules, following the
-   book. *)
+(* Parse-consumers for the expression grammar *)
 
 let rec consume_expression : parse_consumer =
  fun parser -> consume_equality parser
@@ -204,6 +220,64 @@ and consume_primary : parse_consumer =
           Ok (advance_ceil after_inner, Ast.Grouping inner)
         else Error UnexpectedToken
     | _ -> Error UnexpectedToken
+
+(* Parse-consumers for the statement grammar *)
+(* TODO: how should we change the parse_consumer type so that it can produce
+   statement nodes, instead of just expression nodes? *)
+
+let consume_statement =
+  let open Token in
+  let ( let* ) = Result.bind in
+  fun parser ->
+    (* Try to consume a "print" token *)
+    let* after_print_if_any, print_opt =
+      consume_token_if_match [ Print ] parser
+      |> Result.map_error (fun Eof -> UnexpectedEof)
+    in
+    (* Whether "print" was matched or not, expect an expression followed by a
+       semicolon *)
+    let* after_expr, expr = consume_expression after_print_if_any in
+    let* after_semicolon, _ =
+      expect_consume_token_if_match [ Semicolon ] after_expr
+    in
+    (* Check if "print" was consumed, and build the right statement node *)
+    let stmt =
+      match print_opt with
+      | Some _ -> Ast.PrintStmt expr
+      | None -> Ast.ExpressionStmt expr
+    in
+    Ok (after_semicolon, stmt)
+
+let consume_declaration =
+  let open Token in
+  let ( let* ) = Result.bind in
+  fun parser ->
+    (* Try to consume a "var" token *)
+    let* after_var_if_any, var_opt =
+      consume_token_if_match [ Var ] parser
+      |> Result.map_error (fun Eof -> UnexpectedEof)
+    in
+    match var_opt with
+    (* If not matched, consume a statement *)
+    | None -> consume_statement after_var_if_any
+    | Some _ ->
+        (* Now we expect an identifier *)
+        let* after_ident, ident = expect_consume_ident after_var_if_any in
+        let* after_init_if_any, init_opt =
+          consume_token_if_match [ Equal ] after_ident
+          |> Result.map_error (fun Eof -> UnexpectedEof)
+          |> fun res ->
+          Result.bind res (fun match_res ->
+              match match_res with
+              | after_ident', None -> Ok (after_ident', None)
+              | after_equal, Some _ ->
+                  (* If we did match a "=" token, then we expect an
+                     expression *)
+                  let* after_init, init_expr = consume_expression after_equal in
+                  Ok (after_init, Some init_expr))
+        in
+        let var_decl = Ast.VarStmt { name = ident; init_opt } in
+        Ok (after_init_if_any, var_decl)
 
 (** Main entry point for the parser. Given a list of tokens, attempts to parse
     and produce an AST. The list is assumed to not contain a final EOF token.

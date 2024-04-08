@@ -7,6 +7,11 @@ type expression =
   | Literal of obj
   | Grouping of expression
 
+type statement =
+  | ExpressionStmt of expression
+  | PrintStmt of expression
+  | VarStmt of { name : token; init_opt : expression option }
+
 let rec pp expr =
   match expr with
   | Binary { left; op; right } ->
