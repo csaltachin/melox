@@ -22,9 +22,9 @@ and evaluate_unary (op : Token.t) (right : Ast.expression) : eval_result =
   let open Token in
   let* obj = evaluate_expression right in
   match (op.raw, obj) with
-  (* Boolean negation: expects one argument of any type. Evaluates to true if
-     its argument is truthy, false otherwise. *)
-  | Bang, _ -> LoxBoolean (is_truthy obj) |> eval_ok
+  (* Boolean negation: expects one argument of any type. Evaluates to false if
+     its argument is truthy, true otherwise. *)
+  | Bang, _ -> LoxBoolean (is_truthy obj |> not) |> eval_ok
   (* Number negation: expects one argument of type number. Evaluates to the
      float negation of the argument. *)
   | Minus, LoxNumber x -> LoxNumber (Float.neg x) |> eval_ok
