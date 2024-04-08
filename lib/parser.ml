@@ -1,5 +1,8 @@
-type ast = Ast.expression
-(** Type of an AST node. For now, we only have expression nodes. *)
+type expr_node = Ast.expression
+(** Type of AST expression nodes. *)
+
+type stmt_node = Ast.statement
+(** Type of AST statement nodes. *)
 
 type t = { tokens : Token.t list; previous : Token.t option }
 (** Type of parser. Maintains a list of (wrapped) tokens yet to be consumed, as
@@ -11,12 +14,17 @@ type t = { tokens : Token.t list; previous : Token.t option }
 type eof_error = Eof
 type parse_error = UnexpectedToken | UnexpectedEof
 
-type parse_result = (t * ast, parse_error) result
-(** Result type for parse-consumers. *)
+type 'a parse_result = (t * 'a, parse_error) result
+(** Result type for parse-consumers that produce nodes of type ['a], where ['a]
+    is one of [expr_node] or [stmt_node]. *)
 
-type parse_consumer = t -> parse_result
-(** Type of "parse-consumers": operations which take in a parser state and emit
-    either a pair (advanced parser state, new AST node) or a parse error. *)
+type 'a parse_consumer = t -> 'a parse_result
+(** Type of "parse-consumers". An ['a parse_consumer] is an operation which
+    takes in a parser state, and emits either a pair (advanced parser state, new
+    AST node of type ['a]) or a parse error.
+
+    Here ['a] is assumed to be one of [expr_node] (yielding an "expression \
+    parse-consumer") or [stmt_node] (yielding a "statement parse-consumer").*)
 
 (** Initialize a parser from a list of tokens. The functions in the [Parser]
     module assume that this list does not contain a trailing EOF token, e.g. as
@@ -92,11 +100,11 @@ let expect_consume_ident =
     | Ok _ -> Error UnexpectedToken
     | Error Eof -> Error UnexpectedEof
 
-(** Given a parse-consumer [consumer] and a list of raw token kinds [raw_list],
-    returns a new parse-consumer that (greedily) produces a left-associative,
-    binary AST node, whose "leaves" are nodes produced by applications of
-    [consumer]. The operator tokens are those with raw kinds from [raw_list],
-    and they are considered with equal precedence.
+(** Given an expression parse-consumer [consumer] and a list of raw token kinds
+    [raw_list], returns a new expression parse-consumer that (greedily) produces
+    a left-associative, binary AST node, whose "leaves" are nodes produced by
+    applications of [consumer]. The operator tokens are those with raw kinds
+    from [raw_list], and they are considered with equal precedence.
 
     In other words, let [pi] be an operator precedence level, and suppose
     [raw_list] is the list of (raw) operator tokens of precedence [pi]. Then
@@ -119,8 +127,8 @@ let expect_consume_ident =
 
     In particular, if [consumer] is tail-recursive, then this parse-consumer
     will also be tail-recursive. *)
-let consume_binary_left_assoc (consumer : parse_consumer)
-    (raw_list : Token.raw_t list) : parse_consumer =
+let consume_binary_left_assoc (consumer : expr_node parse_consumer)
+    (raw_list : Token.raw_t list) : expr_node parse_consumer =
   let ( let* ) = Result.bind in
   let rec make_aux_list acc parser =
     match consume_token_if_match raw_list parser with
@@ -148,33 +156,33 @@ let consume_binary_left_assoc (consumer : parse_consumer)
     let* after_last, aux_list = make_aux_list [] after_first in
     Ok (after_last, tree_of_aux_list first_node aux_list)
 
-(* Parse-consumers for the expression grammar *)
+(* Parse-consumers for the expression grammar. *)
 
-let rec consume_expression : parse_consumer =
+let rec consume_expression : expr_node parse_consumer =
  fun parser -> consume_equality parser
 
-and consume_equality : parse_consumer =
+and consume_equality : expr_node parse_consumer =
   let open Token in
   fun parser ->
     consume_binary_left_assoc consume_comparison [ EqualEqual; BangEqual ]
       parser
 
-and consume_comparison : parse_consumer =
+and consume_comparison : expr_node parse_consumer =
   let open Token in
   fun parser ->
     consume_binary_left_assoc consume_term
       [ Greater; GreaterEqual; Less; LessEqual ]
       parser
 
-and consume_term : parse_consumer =
+and consume_term : expr_node parse_consumer =
   let open Token in
   fun parser -> consume_binary_left_assoc consume_factor [ Plus; Minus ] parser
 
-and consume_factor : parse_consumer =
+and consume_factor : expr_node parse_consumer =
   let open Token in
   fun parser -> consume_binary_left_assoc consume_unary [ Star; Slash ] parser
 
-and consume_unary : parse_consumer =
+and consume_unary : expr_node parse_consumer =
   let open Token in
   let ( let* ) = Result.bind in
   let is_unary_op raw_token =
@@ -189,7 +197,7 @@ and consume_unary : parse_consumer =
         Ok (after_node, node)
     | _ -> consume_primary parser
 
-and consume_primary : parse_consumer =
+and consume_primary : expr_node parse_consumer =
   let open Token in
   let ( let* ) = Result.bind in
   fun parser ->
@@ -221,11 +229,9 @@ and consume_primary : parse_consumer =
         else Error UnexpectedToken
     | _ -> Error UnexpectedToken
 
-(* Parse-consumers for the statement grammar *)
-(* TODO: how should we change the parse_consumer type so that it can produce
-   statement nodes, instead of just expression nodes? *)
+(* Parse-consumers for the statement grammar. *)
 
-let consume_statement =
+let consume_statement : stmt_node parse_consumer =
   let open Token in
   let ( let* ) = Result.bind in
   fun parser ->
@@ -248,7 +254,7 @@ let consume_statement =
     in
     Ok (after_semicolon, stmt)
 
-let consume_declaration =
+let consume_declaration : stmt_node parse_consumer =
   let open Token in
   let ( let* ) = Result.bind in
   fun parser ->
