@@ -15,6 +15,13 @@ let is_equal left_obj right_obj =
   | LoxNumber left_num, LoxNumber right_num -> left_num = right_num
   | _, _ -> false
 
+let string_of_type obj =
+  match obj with
+  | LoxNumber _ -> "number"
+  | LoxString _ -> "string"
+  | LoxBoolean _ -> "boolean"
+  | LoxNil -> "nil"
+
 let pp_obj obj =
   match obj with
   | LoxNumber x -> Printf.sprintf "%g" x
